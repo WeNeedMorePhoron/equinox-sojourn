@@ -25,27 +25,30 @@
 // EQUINOX EDIT START - furry - apply bodymarkings, copypasta from regular organic limbs.
 	for(var/M in markings)
 		var/datum/sprite_accessory/marking/mark_style = markings[M]["datum"]
-		var/icon/mark_s
-		var/icon/mark_splice	//temporary var to facilitate splicing together feet sprites into leg sprites where relevant
-
-		mark_s = new/icon("icon" = mark_style.icon, "icon_state" = "[mark_style.icon_state]-[organ_tag]")
+		var/mutable_appearance/mark_s = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-[organ_tag]")
+		var/mutable_appearance/mark_splice //temporary var to facilitate splicing together feet sprites into leg sprites where relevant
 
 	// Horrible hackjob to botch together hands and feet into their parent limbs where relevant
 		if(organ_tag == BP_L_LEG && (BP_L_FOOT in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-l_foot")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-l_foot")
 		else if(organ_tag == BP_R_LEG && (BP_R_FOOT in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-r_foot")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-r_foot")
 		else if(organ_tag == BP_L_ARM && (BP_L_HAND in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-l_hand")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-l_hand")
 		else if(organ_tag == BP_R_ARM && (BP_R_HAND in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-r_hand")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-r_hand")
 
 		if(mark_splice && mark_s)
-			mark_s.Blend(mark_splice, ICON_OVERLAY)
+			mark_s.add_overlay(mark_splice)
 
-		mark_s.Blend(markings[M]["color"], mark_style.blend)
+		if(mark_style.blend == ICON_ADD)
+			mark_s.color = color_to_full_rgba_matrix(markings[M]["color"])
+		else
+			mark_s.color = markings[M]["color"]
+
 		add_overlay(mark_s) //So when it's not on your body, it has icons
-		mob_icon.Blend(mark_s, ICON_OVERLAY) //So when it's on your body, it has icons
+		alpha = nonsolid ? 180 : 255
+		mob_icon.add_overlay(mark_s) //So when it's on your body, it has icons
 // EQUINOX EDIT END
 
 	icon = mob_icon

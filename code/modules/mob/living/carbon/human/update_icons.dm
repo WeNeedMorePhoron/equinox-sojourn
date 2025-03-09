@@ -154,7 +154,7 @@ Please contact me on #coderbus IRC. ~Carn x
 	cut_overlays()
 
 	if (icon_update)
-		icon = stand_icon
+		add_overlay(stand_icon)
 		for(var/I in overlays_standing)
 			add_overlay(I)
 		if(emissive_eyes)	//insanely janky workaround
@@ -296,7 +296,7 @@ var/global/list/wings_icon_cache = list()
 
 			appearance_test.Log("Generated key: [icon_key]")
 
-		var/icon/base_icon
+		var/mutable_appearance/base_icon
 		if(appearance_test.cache_sprites && human_icon_cache[icon_key])
 			appearance_test.Log("Cached icon found.")
 			base_icon = human_icon_cache[icon_key]
@@ -304,51 +304,47 @@ var/global/list/wings_icon_cache = list()
 			appearance_test.Log("New icon will be generated.")
 
 			//BEGIN CACHED ICON GENERATION.
-			base_icon = new('icons/mob/human.dmi',"blank")
+			base_icon = mutable_appearance('icons/mob/human.dmi',"blank")
 
 			for(var/obj/item/organ/external/part in organs)
-				var/icon/temp = part.get_icon(skeleton)
+				var/mutable_appearance/temp = part.get_icon(skeleton)
 				if(!temp)
 					continue
 				//That part makes left and right legs drawn topmost and lowermost when human looks WEST or EAST
 				//And no change in rendering for other parts (they icon_position is 0, so goes to 'else' part)
 				if(part.icon_position&(LEFT|RIGHT))
-					var/icon/temp2 = new('icons/mob/human.dmi',"blank")
-					temp2.Insert(new/icon(temp,dir=NORTH),dir=NORTH)
-					temp2.Insert(new/icon(temp,dir=SOUTH),dir=SOUTH)
-					if(!(part.icon_position & LEFT))
-						temp2.Insert(new/icon(temp,dir=EAST),dir=EAST)
-					if(!(part.icon_position & RIGHT))
-						temp2.Insert(new/icon(temp,dir=WEST),dir=WEST)
-					base_icon.Blend(temp2, ICON_OVERLAY)
-					if(part.icon_position & LEFT)
-						temp2.Insert(new/icon(temp,dir=EAST),dir=EAST)
-					if(part.icon_position & RIGHT)
-						temp2.Insert(new/icon(temp,dir=WEST),dir=WEST)
-					base_icon.Blend(temp2, ICON_UNDERLAY)
+					var/mutable_appearance/temp2 = mutable_appearance('icons/mob/human.dmi',"blank")
+					// temp2.Insert(new/icon(temp,dir=NORTH),dir=NORTH)
+					// temp2.Insert(new/icon(temp,dir=SOUTH),dir=SOUTH)
+					// if(!(part.icon_position & LEFT))
+					// 	temp2.Insert(new/icon(temp,dir=EAST),dir=EAST)
+					// if(!(part.icon_position & RIGHT))
+					// 	temp2.Insert(new/icon(temp,dir=WEST),dir=WEST)
+					// base_icon.Blend(temp2, ICON_OVERLAY)
+					// if(part.icon_position & LEFT)
+					// 	temp2.Insert(new/icon(temp,dir=EAST),dir=EAST)
+					// if(part.icon_position & RIGHT)
+					// 	temp2.Insert(new/icon(temp,dir=WEST),dir=WEST)
+					base_icon.add_underlay(temp2)
 				else
-					base_icon.Blend(temp, ICON_OVERLAY)
+					base_icon.add_overlay(temp)
 
 			if(!skeleton)
 				if(husk)
-					base_icon.ColorTone(husk_color_mod)
+					base_icon.color = husk_color_mod
 				else if(hulk)
-					var/list/tone = ReadRGB(hulk_color_mod)
-					base_icon.MapColors(rgb(tone[1],0,0),rgb(0,tone[2],0),rgb(0,0,tone[3]))
+					base_icon.color = hulk_color_mod
 
 			//Handle husk overlay.
 			if(husk && ("overlay_husk" in icon_states(form.base)))
-				var/icon/mask = new(base_icon)
-				var/icon/husk_over = new(form.base,"overlay_husk")
-				mask.MapColors(0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,0)
-				husk_over.Blend(mask, ICON_ADD)
-				base_icon.Blend(husk_over, ICON_OVERLAY)
+				var/mutable_appearance/husk_over = mutable_appearance(form.base,"overlay_husk")
+				base_icon.add_overlay(husk_over)
 
 		if(appearance_test.cache_sprites)
 			human_icon_cache[icon_key] = base_icon
 
 		//END CACHED ICON GENERATION.
-		stand_icon.Blend(base_icon,ICON_OVERLAY)
+		stand_icon.add_overlay(base_icon)
 
 	//ears, wings and tail
 	//update_marking(0)	Equinox edit - Switching body markings to per-limb system
@@ -477,65 +473,6 @@ var/global/list/wings_icon_cache = list()
 
 	if(update_icons) update_icons()
 
-/* Dummying these as they have been superceded by the per-limb body marking system (see organ_icon.dm)
-//Markings
-/mob/living/carbon/human/proc/update_marking(var/update_icons = 1)
-	if(QDESTROYING(src))
-		return
-
-	overlays_standing[MARKINGS_LAYER] = null
-
-	var/marking_image = get_marking_image()
-	if(marking_image)
-		overlays_standing[MARKINGS_LAYER] = marking_image
-		if(update_icons) update_icons()
-
-/mob/living/carbon/human/proc/get_marking_image()
-	if(!body_markings) return
-	var/icon/marking_icon
-	for(var/markname in body_markings)
-		var/datum/sprite_accessory/marking/real_marking = GLOB.body_marking_list[markname]
-		var/list/valid_body_parts = list()
-		for(var/part in real_marking.body_parts)
-			//Eris lacks hands and feet. This code should allow hands and feet.
-			//This exists because the sprites are separated over all limbs whereas this codebase doesn't have hands or feet.
-			//Apparently chest and groin are considered disembodied, which I otherwise used to exclude severed limbs.
-			var/valid = (part in organs_by_name) && organs_by_name[part] && ((part in BP_BASE_PARTS) || organs_by_name[part]:nerve_struck >= 0)
-			if(!valid)
-				for(var/organ in organs_by_name)
-					var/obj/item/organ/external/O = organs_by_name[organ]
-					if(O.nerve_struck >= 0 && (part in O.additional_limb_parts))
-						valid = TRUE
-						break
-			if(valid && ("[real_marking.icon_state]-[part]" in icon_states(real_marking.icon)))
-				valid_body_parts += part
-			CHECK_TICK
-		var/icon/specific_marking_icon
-		var/cache_key = "[markname]-[valid_body_parts.Join("_")]"
-		var/advanced_cache_key = "B*[cache_key]*[body_markings[markname]]*[real_marking.blend]" //The *B is there to prevent collisions.
-		cache_key = "A*[cache_key]" //To prevent collisions.
-		if(marking_cache[advanced_cache_key]) //Done like this in case the result is null.
-			specific_marking_icon = new /icon(marking_cache[advanced_cache_key])
-		else
-			if(marking_cache[cache_key]) //We have the grey version but not the colored.
-				specific_marking_icon = new /icon(marking_cache[cache_key])
-			else
-				specific_marking_icon = new()
-				for(var/part in valid_body_parts)
-					var/icon/specific_marking_subicon = icon(real_marking.icon, "[real_marking.icon_state]-[part]")
-					specific_marking_subicon.Blend(specific_marking_icon, ICON_UNDERLAY)
-					specific_marking_icon = specific_marking_subicon
-				marking_cache[cache_key] = new /icon(specific_marking_icon)
-			specific_marking_icon.Blend(body_markings[markname], real_marking.blend) //This should be a colour.
-			marking_cache[advanced_cache_key] = new /icon(specific_marking_icon)
-		if(marking_icon)
-			marking_icon.Blend(specific_marking_icon, ICON_OVERLAY)
-		else //WARNING: THIS WILL BREAK IF WE EVER USE INCONSISTENT MARKING SIZES
-			marking_icon = specific_marking_icon
-		CHECK_TICK
-	return image(marking_icon)
-*/
-
 //Insert Furry Bits
 /mob/living/carbon/human/proc/update_ears(var/update_icons = 1)
 	if(QDESTROYING(src))
@@ -602,12 +539,8 @@ var/global/list/wings_icon_cache = list()
 		return
 
 	overlays_standing[CUSTOM_TAIL_LAYER] = null
-	overlays_standing[CUSTOM_TAIL_LAYER_ALT] = null// Technique ripped from VORE, alternate tail layer
-	/*
-	if(wear_suit && wear_suit.flags_inv & HIDETAIL && !(istype(tail, /datum/sprite_accessory/tail/taur) || wear_suit.flags_inv & HIDETAUR))
-		if(update_icons) update_icons()
-		return
-	*/
+	overlays_standing[CUSTOM_TAIL_LAYER_ALT] = null
+
 	var/active_tail_layer = tail_over ? CUSTOM_TAIL_LAYER_ALT : CUSTOM_TAIL_LAYER
 
 	var/tail_image = get_tail_image()
@@ -615,13 +548,6 @@ var/global/list/wings_icon_cache = list()
 		overlays_standing[active_tail_layer] = tail_image
 		if(update_icons) update_icons()
 
-/*	var/species_tail = species.get_tail(src) // Species tail icon_state prefix.
-
-	//This one is actually not that bad I guess.
-	if(species_tail && !(wear_suit && wear_suit.flags_inv & HIDETAIL))
-		var/icon/tail_s = get_tail_icon()
-		overlays_standing[used_tail_layer] = image(icon = tail_s, icon_state = "[species_tail]_s", layer = BODY_LAYER+used_tail_layer) // VOREStation Edit - Alt Tail Layer
-		animate_tail_reset()*/
 
 /mob/living/carbon/human/proc/get_tail_image()
 	if(!tail) return

@@ -96,25 +96,23 @@ var/global/list/limb_icon_cache = list()
 
 	if(owner.species.has_process[OP_EYES])
 		for(var/obj/item/organ/internal/eyes/eyes in owner.organ_list_by_process(OP_EYES))
-			mob_icon.Blend(eyes.get_icon(), ICON_OVERLAY)
+			mob_icon.add_overlay(eyes.get_icon())
 
 	if(owner.lip_style && (form && (form.appearance_flags & HAS_LIPS)))
 		var/icon/lip_icon = new/icon(owner.form.face, "lips[owner.lip_style]")
-		mob_icon.Blend(lip_icon, ICON_OVERLAY)
+		mob_icon.add_overlay(lip_icon)
 
 	if(owner.f_style && !(owner.head && (owner.head.flags_inv & BLOCKHAIR)))
 		var/datum/sprite_accessory/facial_hair_style = GLOB.facial_hair_styles_list[owner.f_style]
 		if(facial_hair_style && (!facial_hair_style.species_allowed || (form.get_bodytype() in facial_hair_style.species_allowed)))
-			var/icon/facial = new/icon(facial_hair_style.icon, facial_hair_style.icon_state)
-			if(facial_hair_style.colored_layers)
-				facial.Blend(owner.facial_color, ICON_ADD)
+			var/mutable_appearance/facial = mutable_appearance(facial_hair_style.icon, facial_hair_style.icon_state)
+			facial.color = owner.facial_color
 			add_overlay(facial)
 	if(owner.h_style && !(owner.head && (owner.head.flags_inv & BLOCKHEADHAIR)))
 		var/datum/sprite_accessory/hair_style = GLOB.hair_styles_list[owner.h_style]
 		if(hair_style && (!hair_style.species_allowed || (form.get_bodytype() in hair_style.species_allowed)))
-			var/icon/hair = new/icon(hair_style.icon, hair_style.icon_state)
-			if(hair_style.colored_layers)
-				hair.Blend(hair_col, ICON_ADD)
+			var/mutable_appearance/hair = mutable_appearance(hair_style.icon, hair_style.icon_state)
+			hair.color = hair_col
 			add_overlay(hair)
 
 	return mob_icon
@@ -151,7 +149,7 @@ var/global/list/limb_icon_cache = list()
 
 		icon_state = "[organ_tag][gender][is_stump()?"_s":""]"
 
-	mob_icon = new/icon(icon, icon_state)
+	mob_icon = mutable_appearance(icon, icon_state)
 
 	if(!is_stump())
 		for(var/subicon in additional_limb_parts)
@@ -159,50 +157,48 @@ var/global/list/limb_icon_cache = list()
 			if(!("[subicon][subgender]" in icon_states(icon)))
 				subgender = ""
 			if("[subicon][subgender]" in icon_states(icon))
-				var/icon/L = new(icon, "[subicon][subgender]")
-				mob_icon.Blend(L, ICON_OVERLAY)
+				var/mutable_appearance/L = mutable_appearance(icon, "[subicon][subgender]")
+				mob_icon.add_overlay(L)
 
 	if(appearance_test.colorize_organ)
 		if(status & ORGAN_DEAD)
-			mob_icon.ColorTone(rgb(10,50,0))
-			mob_icon.SetIntensity(0.7)
+			mob_icon.color = rgb(10, 50, 0, 0.7)
 		if(skin_col)
-			mob_icon.Blend(skin_col, ICON_MULTIPLY)
+			mob_icon.color *= skin_col
 		else if(skin_tone)
 			if(skin_tone >= 0)
-				mob_icon.Blend(rgb(skin_tone, skin_tone, skin_tone), ICON_ADD)
+				mob_icon.color += rgb(skin_tone, skin_tone, skin_tone)
 			else
-				mob_icon.Blend(rgb(-skin_tone,  -skin_tone,  -skin_tone), ICON_SUBTRACT)
+				mob_icon.color -= rgb(-skin_tone,  -skin_tone,  -skin_tone)
 
 	// EQUINOX EDIT START - furry - apply bodymarkings
 	for(var/M in markings)
 		var/datum/sprite_accessory/marking/mark_style = markings[M]["datum"]
-		var/icon/mark_s
-		var/icon/mark_splice	//temporary var to facilitate splicing together feet sprites into leg sprites where relevant
-
-		mark_s = new/icon("icon" = mark_style.icon, "icon_state" = "[mark_style.icon_state]-[organ_tag]")
+		var/mutable_appearance/mark_s = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-[organ_tag]")
+		var/mutable_appearance/mark_splice //temporary var to facilitate splicing together feet sprites into leg sprites where relevant
 
 	// Horrible hackjob to botch together hands and feet into their parent limbs where relevant
 		if(organ_tag == BP_L_LEG && (BP_L_FOOT in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-l_foot")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-l_foot")
 		else if(organ_tag == BP_R_LEG && (BP_R_FOOT in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-r_foot")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-r_foot")
 		else if(organ_tag == BP_L_ARM && (BP_L_HAND in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-l_hand")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-l_hand")
 		else if(organ_tag == BP_R_ARM && (BP_R_HAND in mark_style.body_parts))
-			mark_splice = new/icon(mark_style.icon, "[mark_style.icon_state]-r_hand")
+			mark_splice = mutable_appearance(mark_style.icon, "[mark_style.icon_state]-r_hand")
 
 		if(mark_splice && mark_s)
-			mark_s.Blend(mark_splice, ICON_OVERLAY)
+			mark_s.add_overlay(mark_splice)
 
-		mark_s.Blend(markings[M]["color"], mark_style.blend)
+		if(mark_style.blend == ICON_ADD)
+			mark_s.color = color_to_full_rgba_matrix(markings[M]["color"])
+		else
+			mark_s.color = markings[M]["color"]
+
 		add_overlay(mark_s) //So when it's not on your body, it has icons
 		alpha = nonsolid ? 180 : 255
-		mob_icon.Blend(mark_s, ICON_OVERLAY) //So when it's on your body, it has icons
-	// EQUINOX EDIT END
-
-	dir = EAST
-	icon = mob_icon
+		mob_icon.add_overlay(mark_s) //So when it's on your body, it has icons
+		return mob_icon
 
 /obj/item/organ/external/proc/get_icon()
 	update_icon()
