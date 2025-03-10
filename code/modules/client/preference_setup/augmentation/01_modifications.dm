@@ -163,6 +163,4 @@
 			pref.check_child_modifications(pref.current_organ)
 		return TOPIC_REFRESH_UPDATE_PREVIEW
 
-		return TOPIC_REFRESH
-
 	return ..()
