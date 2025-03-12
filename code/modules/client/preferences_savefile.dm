@@ -70,6 +70,7 @@
 		S.cd = GLOB.maps_data.character_load_path(S, default_slot)
 
 	loaded_character = S
+	categoriesChanged = "All"	//Forces the character editor to refresh everything, preventing characters from getting their body markings (visually) mixed up
 
 	return 1
 
