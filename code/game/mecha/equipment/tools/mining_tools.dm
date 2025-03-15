@@ -18,7 +18,10 @@
 	required_type = list(/obj/mecha/working, /obj/mecha/combat, /obj/mecha/medical)
 
 /obj/item/mecha_parts/mecha_equipment/tool/drill/action(atom/T, mob/living/user)
-	attack_object(T, user) // drill has nothing special to do, just drilling
+	attack_object(T, user) // Drill the target tile
+	for(var/turf/simulated/mineral/M in range(chassis, 1))
+		if(get_dir(chassis, M) in get_neighbor_directions(get_dir(chassis, T)))
+			attack_object(M, user) // And the two neighboring one
 
 /obj/item/mecha_parts/mecha_equipment/tool/drill/attack_object(obj/T, mob/living/user) // attack_object override for all of the drill's fancy interactions after action()
 	..() // strike the earth
@@ -27,8 +30,7 @@
 		var/obj/structure/ore_box/ore_box = locate(/obj/structure/ore_box) in chassis.cargo
 		if(ore_box)
 			for(var/obj/item/stack/ore/ore in range(chassis,1))
-				if(get_dir(chassis,ore)&chassis.dir)
-					ore.Move(ore_box)
+				ore.Move(ore_box)
 
 	return 1
 
